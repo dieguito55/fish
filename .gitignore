@@ -1,0 +1,25 @@
+# Python setup
+__pycache__/
+*.py[cod]
+*.so
+.venv
+env/
+venv/
+
+# Environment variables
+.env
+
+# Data (Nunca subir datasets crudos a git)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Models (Los pesos se versionan aparte o se descargan)
+*.pt
+*.onnx
+runs/
+
+# IDEs
+.vscode/
+.idea/

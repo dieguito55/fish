@@ -1,0 +1,11 @@
+# RUTA ABSOLUTA EXACTA (Copiada de tu terminal)
+# Nota: Usamos '/' en lugar de '\' porque en YAML/Python funciona mejor y evita errores de escape.
+path: D:/01. NOVENO SEMESTRE/PROCESAMIENTO DE LENGUAJE NATURAL/segunda_unidad/final/fishwatch/data/splits
+
+train: train/images
+val: val/images
+test: test/images
+
+# Clases
+nc: 1
+names: ['Fish']

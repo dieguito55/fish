@@ -1,0 +1,38 @@
+# --- Core & Data ---
+numpy>=1.24.0
+pandas>=2.0.0
+tqdm
+python-dotenv
+pyyaml
+
+# --- Computer Vision (YOLOv8 + OpenCV) ---
+ultralytics>=8.0.0
+opencv-python-headless>=4.8.0  # Headless para servidores, usa opencv-python para local si necesitas GUI
+pillow
+
+# --- Backend & Database ---
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+
+# --- Dashboard ---
+streamlit>=1.28.0
+plotly
+matplotlib
+
+# --- NLP (Transformers) ---
+transformers
+--index-url https://download.pytorch.org/whl/cu128
+--extra-index-url https://pypi.org/simple
+torch
+torchvision
+torchaudio
+scipy  # A veces requerido por librerías de audio/texto
+accelerate
+
+# --- Dev/Tools ---
+black  # Para formateo de código (buena práctica)
+pytest # Para testing
+psycopg2-binary
+httpx

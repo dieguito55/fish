@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FishWatch Live - Premium Monitoring</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles_new.css">
+</head>
+<body>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-fish"></i>
+                <div class="logo-text">
+                    <h1>FISHWATCH</h1>
+                    <span>LIVE</span>
+                </div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <button class="nav-item active" onclick="switchView('camera')" data-view="camera">
+                <i class="fas fa-video"></i>
+                <span>Cámara en Vivo</span>
+            </button>
+            <button class="nav-item" onclick="switchView('dashboard')" data-view="dashboard">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard</span>
+            </button>
+            <button class="nav-item" onclick="switchView('history')" data-view="history">
+                <i class="fas fa-history"></i>
+                <span>Histórico</span>
+            </button>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="export-btn" onclick="exportCSV()">
+                <i class="fas fa-download"></i>
+                <span>Exportar CSV</span>
+            </button>
+            <div class="api-status" id="apiStatus">
+                <div class="status-dot offline"></div>
+                <span>API Offline</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2 id="viewTitle">Cámara en Vivo</h2>
+            </div>
+            <div class="topbar-right">
+                <div class="status-badge" id="liveStatus">
+                    <i class="fas fa-circle"></i>
+                    <span>OFFLINE</span>
+                </div>
+                <div class="metrics-mini">
+                    <div class="metric-item">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span id="topbarFps">0</span>
+                        <small>FPS</small>
+                    </div>
+                    <div class="metric-item">
+                        <i class="fas fa-clock"></i>
+                        <span id="topbarLatency">0</span>
+                        <small>ms</small>
+                    </div>
+                </div>
+                <button class="btn-control start" id="startBtn" onclick="toggleStream()" style="display: none;">
+                    <i class="fas fa-play"></i>
+                    <span>Iniciar</span>
+                </button>
+                <button class="btn-icon" onclick="toggleSettings()">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- VIEW: CAMERA -->
+        <section class="view camera-view active" id="cameraView">
+            <div class="camera-grid">
+                <div class="video-main">
+                    <div class="video-wrapper">
+                        <video id="videoElement" autoplay playsinline></video>
+                        <canvas id="overlayCanvas"></canvas>
+
+                        <div class="video-hud">
+                            <div class="hud-item">
+                                <i class="fas fa-fish"></i>
+                                <span id="hudCount">0</span>
+                                <small>Detectados</small>
+                            </div>
+                            <div class="hud-item">
+                                <i class="fas fa-percentage"></i>
+                                <span id="hudConfidence">0%</span>
+                                <small>Confianza</small>
+                            </div>
+                            <div class="hud-item">
+                                <i class="fas fa-stopwatch"></i>
+                                <span id="hudFps">0</span>
+                                <small>FPS</small>
+                            </div>
+                        </div>
+
+                        <div class="video-placeholder" id="videoPlaceholder" style="display: flex;">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Sube un video para comenzar</p>
+                            <small>Formatos: .mp4, .avi, .mov</small>
+                        </div>
+                    </div>
+
+                    <!-- Controles de reproducción de video -->
+                    <div class="video-playback-controls" id="videoPlaybackControls" style="display: none;">
+                        <div class="playback-buttons">
+                            <button class="btn-icon" onclick="previousFrame()" title="Frame Anterior">
+                                <i class="fas fa-step-backward"></i>
+                            </button>
+                            <button class="btn-icon" onclick="rewindVideo()" title="Retroceder 10s">
+                                <i class="fas fa-backward"></i>
+                            </button>
+                            <button class="btn-icon" id="playPauseBtn" onclick="togglePlayPause()" title="Play/Pause">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button class="btn-icon" onclick="forwardVideo()" title="Adelantar 10s">
+                                <i class="fas fa-forward"></i>
+                            </button>
+                            <button class="btn-icon" onclick="nextFrame()" title="Frame Siguiente">
+                                <i class="fas fa-step-forward"></i>
+                            </button>
+                        </div>
+
+                        <div class="playback-timeline">
+                            <input type="range" id="videoTimeline" min="0" max="100" value="0" oninput="seekVideo(this.value)">
+                            <div class="playback-time">
+                                <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="video-controls">
+                        <!-- Botón para subir video -->
+                        <div class="control-section">
+                            <h4><i class="fas fa-upload"></i> Cargar Video</h4>
+                            <button class="btn-primary" style="width: 100%;" onclick="document.getElementById('fileInput').click()">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                Seleccionar Video
+                            </button>
+                            <input type="file" id="fileInput" accept="video/*" style="display:none;" onchange="handleFileUpload(event)">
+                            <div id="uploadedVideoInfo" style="display: none; margin-top: 8px; padding: 8px; background: rgba(74, 222, 128, 0.1); border-left: 3px solid #4ade80; border-radius: 4px; color: #4ade80; font-size: 13px;">
+                                <i class="fas fa-check-circle"></i>
+                                <span id="uploadedFileName"></span>
+                            </div>
+                        </div>
+
+                        <!-- Control de velocidad -->
+                        <div class="control-section">
+                            <h4><i class="fas fa-tachometer-alt"></i> Velocidad de Reproducción</h4>
+                            <div class="speed-controls">
+                                <button class="speed-btn" onclick="setPlaybackSpeed(0.25)">0.25x</button>
+                                <button class="speed-btn" onclick="setPlaybackSpeed(0.5)">0.5x</button>
+                                <button class="speed-btn active" onclick="setPlaybackSpeed(1)">1x</button>
+                                <button class="speed-btn" onclick="setPlaybackSpeed(1.5)">1.5x</button>
+                                <button class="speed-btn" onclick="setPlaybackSpeed(2)">2x</button>
+                            </div>
+                            <div style="text-align: center; margin-top: 8px; color: #888; font-size: 13px;">
+                                Velocidad actual: <span id="currentSpeed">1.0x</span>
+                            </div>
+                        </div>
+
+                        <!-- Controles de detección -->
+                        <div class="control-section">
+                            <h4><i class="fas fa-sliders-h"></i> Configuración</h4>
+                            <div class="control-group">
+                                <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span>Umbral de confianza</span>
+                                    <span id="thresholdValue" style="color: #4ade80; font-weight: 600;">0.4</span>
+                                </label>
+                                <input type="range" id="thresholdSlider" min="0" max="1" step="0.05" value="0.4" oninput="updateThreshold(this.value)" style="width: 100%;">
+                            </div>
+
+                            <div class="control-group" style="margin-top: 12px;">
+                                <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" id="showBoxes" checked onchange="toggleBoxes()">
+                                    <span>Mostrar cajas de detección</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Acciones -->
+                        <div class="control-section">
+                            <h4><i class="fas fa-cog"></i> Acciones</h4>
+                            <button class="btn-secondary" onclick="captureFrame()" style="width: 100%; margin-bottom: 8px;">
+                                <i class="fas fa-camera"></i>
+                                Capturar Frame
+                            </button>
+                            <button class="btn-danger" onclick="clearDatabase()" style="width: 100%;">
+                                <i class="fas fa-trash-alt"></i>
+                                Limpiar Base de Datos
+                            </button>
+                            <div style="margin-top: 8px; padding: 8px; background: rgba(59, 130, 246, 0.1); border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 12px; color: #3b82f6;">
+                                <i class="fas fa-info-circle"></i> Auto-guardado activo cada 100 frames
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="camera-sidebar">
+                    <!-- Distribución por Zonas -->
+                    <div class="card aqua-zones-card">
+                        <div class="card-header">
+                            <h3>
+                                <i class="fas fa-layer-group"></i>
+                                Distribución por Zona
+                            </h3>
+                            <span class="info-tooltip" title="Distribución de peces en diferentes áreas del tanque">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </div>
+                        <p class="card-description">Control de densidad poblacional por área</p>
+                        
+                        <div class="zones-distribution" id="zonesDistribution">
+                            <div class="zone-row">
+                                <div class="zone-label-wrapper">
+                                    <span class="zone-badge" style="background: #3b82f6;">A</span>
+                                    <span class="zone-name">Zona Superior</span>
+                                </div>
+                                <div class="zone-bar-container">
+                                    <div class="zone-bar-fill" style="width: 0%; background: #3b82f6;" id="zoneA"></div>
+                                </div>
+                                <span class="zone-count-value" id="zoneACount">0</span>
+                            </div>
+                            
+                            <div class="zone-row">
+                                <div class="zone-label-wrapper">
+                                    <span class="zone-badge" style="background: #10b981;">B</span>
+                                    <span class="zone-name">Zona Central</span>
+                                </div>
+                                <div class="zone-bar-container">
+                                    <div class="zone-bar-fill" style="width: 0%; background: #10b981;" id="zoneB"></div>
+                                </div>
+                                <span class="zone-count-value" id="zoneBCount">0</span>
+                            </div>
+                            
+                            <div class="zone-row">
+                                <div class="zone-label-wrapper">
+                                    <span class="zone-badge" style="background: #f59e0b;">C</span>
+                                    <span class="zone-name">Zona Inferior</span>
+                                </div>
+                                <div class="zone-bar-container">
+                                    <div class="zone-bar-fill" style="width: 0%; background: #f59e0b;" id="zoneC"></div>
+                                </div>
+                                <span class="zone-count-value" id="zoneCCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monitoreo en Tiempo Real -->
+                    <div class="card aqua-monitoring-card">
+                        <div class="card-header">
+                            <h3>
+                                <i class="fas fa-chart-area"></i>
+                                Monitoreo en Vivo
+                            </h3>
+                            <span class="live-indicator">
+                                <span class="pulse-dot"></span>
+                                EN VIVO
+                            </span>
+                        </div>
+                        
+                        <div class="aqua-stats">
+                            <div class="aqua-stat-item">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">
+                                    <i class="fas fa-fish"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Peces Detectados</span>
+                                    <span class="stat-value" id="liveCount">0</span>
+                                </div>
+                            </div>
+                            
+                            <div class="aqua-stat-item">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Confianza Promedio</span>
+                                    <span class="stat-value" id="liveConfidence">0%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="aqua-stat-item">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                                    <i class="fas fa-layer-group"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Zona Más Activa</span>
+                                    <span class="stat-value" id="liveTopZone">--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: DASHBOARD -->
+        <section class="view dashboard-view" id="dashboardView">
+            <!-- Hero Section -->
+            <div class="dashboard-hero">
+                <div class="hero-content">
+                    <h2>Dashboard de Acuicultura</h2>
+                    <p>Monitoreo inteligente de poblaciones y comportamiento de peces en tiempo real</p>
+                </div>
+                <div class="hero-actions">
+                    <button class="btn-primary" onclick="exportReport()">
+                        <i class="fas fa-file-export"></i>
+                        Exportar Reporte
+                    </button>
+                </div>
+            </div>
+
+            <!-- KPIs Grid - Métricas Clave para Acuicultura -->
+            <div class="kpis-grid">
+                <div class="kpi-card kpi-primary">
+                    <div class="kpi-icon">
+                        <i class="fas fa-fish"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Población Total Detectada</span>
+                        <span class="kpi-value" id="kpiTotalToday">0</span>
+                        <span class="kpi-subtitle">Peces únicos monitoreados</span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card kpi-success">
+                    <div class="kpi-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Tasa de Actividad</span>
+                        <span class="kpi-value" id="kpiPerMinute">0.0</span>
+                        <span class="kpi-subtitle">Detecciones por minuto</span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card kpi-warning">
+                    <div class="kpi-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Densidad Promedio</span>
+                        <span class="kpi-value" id="kpiDensity">--</span>
+                        <span class="kpi-subtitle">Peces por zona</span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card kpi-info">
+                    <div class="kpi-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Última Sesión</span>
+                        <span class="kpi-value" id="kpiLastSession">--:--</span>
+                        <span class="kpi-subtitle">Hora del último registro</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Análisis de Salud del Tanque -->
+            <div class="aqua-analysis-grid">
+                <div class="card analysis-card">
+                    <div class="card-header">
+                        <h3>
+                            <i class="fas fa-heartbeat"></i>
+                            Estado de Salud del Tanque
+                        </h3>
+                        <span class="status-badge status-good" id="tankStatus">NORMAL</span>
+                    </div>
+                    <p class="card-description">Evaluación basada en patrones de comportamiento y distribución</p>
+                    
+                    <div class="health-indicators">
+                        <div class="health-item">
+                            <div class="health-icon">
+                                <i class="fas fa-balance-scale"></i>
+                            </div>
+                            <div class="health-info">
+                                <span class="health-label">Distribución Espacial</span>
+                                <div class="health-bar">
+                                    <div class="health-fill" id="distributionHealth" style="width: 0%; background: #10b981;"></div>
+                                </div>
+                                <span class="health-value" id="distributionValue">--</span>
+                            </div>
+                        </div>
+                        
+                        <div class="health-item">
+                            <div class="health-icon">
+                                <i class="fas fa-bolt"></i>
+                            </div>
+                            <div class="health-info">
+                                <span class="health-label">Nivel de Actividad</span>
+                                <div class="health-bar">
+                                    <div class="health-fill" id="activityHealth" style="width: 0%; background: #3b82f6;"></div>
+                                </div>
+                                <span class="health-value" id="activityValue">--</span>
+                            </div>
+                        </div>
+                        
+                        <div class="health-item">
+                            <div class="health-icon">
+                                <i class="fas fa-check-double"></i>
+                            </div>
+                            <div class="health-info">
+                                <span class="health-label">Precisión del Monitoreo</span>
+                                <div class="health-bar">
+                                    <div class="health-fill" id="precisionHealth" style="width: 0%; background: #8b5cf6;"></div>
+                                </div>
+                                <span class="health-value" id="precisionValue">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Historial de Sesiones -->
+                <div class="card sessions-card">
+                    <div class="card-header">
+                        <h3>
+                            <i class="fas fa-database"></i>
+                            Historial de Monitoreo
+                        </h3>
+                        <button class="btn-icon-small" onclick="refreshSessions()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <p class="card-description">Registro de sesiones para auditorías y control de calidad</p>
+                    
+                    <div class="sessions-list" id="sessionsList">
+                        <div class="empty-state-small">
+                            <i class="fas fa-clipboard-list"></i>
+                            <p>No hay sesiones registradas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Caso de Uso -->
+            <div class="card use-case-card">
+                <div class="use-case-header">
+                    <div class="use-case-icon">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <div>
+                        <h3>Caso de Uso: Monitoreo de Acuicultura</h3>
+                        <p>Sistema de visión computacional para control de poblaciones en tanques de cultivo</p>
+                    </div>
+                </div>
+                
+                <div class="use-case-features">
+                    <div class="feature-item">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <strong>Control de Densidad</strong>
+                            <p>Monitoreo automático de la cantidad de peces por zona para prevenir sobrepoblación</p>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-item">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <strong>Análisis de Comportamiento</strong>
+                            <p>Detección de patrones anormales que pueden indicar problemas de salud o calidad del agua</p>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-item">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <strong>Trazabilidad y Reportes</strong>
+                            <p>Registro automático de sesiones con timestamps para auditorías y certificaciones de calidad</p>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-item">
+                        <i class="fas fa-check-circle"></i>
+                        <div>
+                            <strong>Optimización de Recursos</strong>
+                            <p>Datos para tomar decisiones sobre alimentación, oxigenación y manejo del tanque</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Latencia Media</span>
+                        <span class="kpi-value" id="kpiAvgLatency">0ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>
+                        <i class="fas fa-chart-line"></i>
+                        Detecciones por Minuto
+                    </h3>
+                    <canvas id="chartTimeseries"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>
+                        <i class="fas fa-chart-bar"></i>
+                        Detecciones por Zona
+                    </h3>
+                    <canvas id="chartZones"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>
+                        <i class="fas fa-chart-pie"></i>
+                        Nivel de Confianza
+                    </h3>
+                    <canvas id="chartConfidence"></canvas>
+                </div>
+                <div class="chart-card heatmap-card">
+                    <h3>
+                        <i class="fas fa-th"></i>
+                        Mapa de Calor por Zonas
+                    </h3>
+                    <div class="heatmap-grid" id="heatmapGrid"></div>
+                </div>
+            </div>
+
+            <!-- Events Table -->
+            <div class="card events-table-card">
+                <div class="table-header">
+                    <h3>
+                        <i class="fas fa-list"></i>
+                        Eventos en Tiempo Real
+                    </h3>
+                    <div class="table-actions">
+                        <button class="btn-secondary" onclick="exportJSON()">
+                            <i class="fas fa-file-code"></i>
+                            JSON
+                        </button>
+                        <button class="btn-secondary" onclick="exportCSV()">
+                            <i class="fas fa-file-csv"></i>
+                            CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Zona</th>
+                                <th>Confianza</th>
+                                <th>BBox</th>
+                                <th>Fuente</th>
+                                <th>Track ID</th>
+                            </tr>
+                        </thead>
+                        <tbody id="eventsTableBody">
+                            <tr class="empty-row">
+                                <td colspan="6">
+                                    <i class="fas fa-inbox"></i>
+                                    Sin eventos registrados
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: HISTORY -->
+        <section class="view history-view" id="historyView">
+            <!-- Hero Section -->
+            <div class="dashboard-hero">
+                <div class="hero-content">
+                    <h2>Histórico de Detecciones</h2>
+                    <p>Análisis temporal y exportación de datos históricos</p>
+                </div>
+                <div class="hero-actions">
+                    <button class="btn-primary" onclick="exportHistoryCSV()">
+                        <i class="fas fa-file-csv"></i>
+                        Exportar CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Resumen Estadístico -->
+            <div class="kpis-grid">
+                <div class="kpi-card kpi-primary">
+                    <div class="kpi-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Total de Registros</span>
+                        <span class="kpi-value" id="historyTotalRecords">0</span>
+                        <span class="kpi-subtitle">Detecciones almacenadas</span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card kpi-success">
+                    <div class="kpi-icon">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Días con Actividad</span>
+                        <span class="kpi-value" id="historyActiveDays">0</span>
+                        <span class="kpi-subtitle">Días registrados</span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card kpi-warning">
+                    <div class="kpi-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Promedio Diario</span>
+                        <span class="kpi-value" id="historyAvgDaily">0</span>
+                        <span class="kpi-subtitle">Detecciones por día</span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card kpi-info">
+                    <div class="kpi-icon">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Confianza Promedio</span>
+                        <span class="kpi-value" id="historyAvgConfidence">0%</span>
+                        <span class="kpi-subtitle">Precisión del modelo</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="card">
+                <h3>
+                    <i class="fas fa-filter"></i>
+                    Filtros de Búsqueda
+                </h3>
+                <div class="filter-grid">
+                    <div class="control-group">
+                        <label><i class="fas fa-calendar"></i> Fecha Inicio</label>
+                        <input type="date" id="filterStartDate" class="filter-input">
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fas fa-calendar"></i> Fecha Fin</label>
+                        <input type="date" id="filterEndDate" class="filter-input">
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fas fa-layer-group"></i> Zona</label>
+                        <select id="filterZone" class="filter-input">
+                            <option value="all">Todas las zonas</option>
+                            <option value="A">Zona A - Superior</option>
+                            <option value="B">Zona B - Central</option>
+                            <option value="C">Zona C - Inferior</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fas fa-percentage"></i> Confianza Mínima</label>
+                        <input type="number" id="filterMinConfidence" min="0" max="100" value="0" class="filter-input">
+                    </div>
+                </div>
+                <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
+                    <button class="btn-primary" onclick="applyHistoryFilters()">
+                        <i class="fas fa-search"></i>
+                        Aplicar Filtros
+                    </button>
+                    <button class="btn-secondary" onclick="clearHistoryFilters()">
+                        <i class="fas fa-times"></i>
+                        Limpiar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabla de Registros -->
+            <div class="card events-table-card">
+                <div class="table-header">
+                    <h3>
+                        <i class="fas fa-table"></i>
+                        Registros de Detecciones
+                    </h3>
+                    <div class="table-actions">
+                        <button class="btn-secondary" onclick="refreshHistoryTable()">
+                            <i class="fas fa-sync-alt"></i>
+                            Actualizar
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="events-table" id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha/Hora</th>
+                                <th>Zona</th>
+                                <th>Confianza</th>
+                                <th>Coordenadas</th>
+                                <th>Frame</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="6" class="empty-row">
+                                    <i class="fas fa-inbox"></i>
+                                    <br>No hay registros disponibles
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-pagination" id="historyPagination" style="margin-top: var(--space-md); display: flex; justify-content: center; gap: var(--space-sm);">
+                    <button class="btn-secondary" onclick="historyPrevPage()" id="btnHistoryPrev" disabled>
+                        <i class="fas fa-chevron-left"></i>
+                        Anterior
+                    </button>
+                    <span id="historyPageInfo" style="padding: var(--space-sm) var(--space-md); background: var(--light-bg); border-radius: var(--radius-sm); font-weight: 600;">
+                        Página 1 de 1
+                    </span>
+                    <button class="btn-secondary" onclick="historyNextPage()" id="btnHistoryNext" disabled>
+                        Siguiente
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Gráfico de Tendencias -->
+            <div class="card">
+                <h3>
+                    <i class="fas fa-chart-area"></i>
+                    Tendencia de Detecciones
+                </h3>
+                <p class="card-description">Evolución temporal de las detecciones por zona</p>
+                <div id="historyChart" style="height: 300px; display: flex; align-items: center; justify-content: center; background: var(--light-bg); border-radius: var(--radius-md); color: rgba(0,0,0,0.5);">
+                    <div style="text-align: center;">
+                        <i class="fas fa-chart-line" style="font-size: 48px; margin-bottom: var(--space-md); opacity: 0.3;"></i>
+                        <p>Los datos se cargarán cuando apliques los filtros</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- PiP Preview - Picture in Picture cuando cambias de vista -->
+    <div class="pip-preview" id="pipPreview" style="display: none;">
+        <div class="pip-header">
+            <span>
+                <i class="fas fa-video"></i>
+                Detección en Vivo
+            </span>
+            <div class="pip-actions">
+                <button onclick="closePip()" title="Volver a cámara">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="pip-video">
+            <canvas id="pipCanvas"></canvas>
+            <div class="pip-hud">
+                <i class="fas fa-fish"></i>
+                <span id="pipCount">0</span> detectados
+            </div>
+        </div>
+    </div>
+
+    <!-- CHATBOT FLOATING -->
+    <div class="chatbot-widget" id="chatbotWidget">
+        <button class="chatbot-toggle" onclick="toggleChatbot()">
+            <i class="fas fa-comments"></i>
+        </button>
+        <div class="chatbot-panel" id="chatbotPanel">
+            <div class="chatbot-header">
+                <h4>
+                    <i class="fas fa-robot"></i>
+                    Asistente NLP
+                </h4>
+                <button class="btn-close" onclick="toggleChatbot()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="chatbot-messages" id="chatbotMessages">
+                <div class="chat-message bot">
+                    <i class="fas fa-robot"></i>
+                    <p>¡Hola! Pregúntame sobre las detecciones.</p>
+                </div>
+            </div>
+            <div class="chatbot-quick">
+                <button class="quick-chip" onclick="askQuestion('Resumen del día')">Resumen del día</button>
+                <button class="quick-chip" onclick="askQuestion('Hora pico')">Hora pico</button>
+                <button class="quick-chip" onclick="askQuestion('Zonas con más peces')">Zonas activas</button>
+            </div>
+            <div class="chatbot-input">
+                <input type="text" id="chatInput" placeholder="Escribe tu pregunta..." onkeypress="handleChatKeypress(event)">
+                <button onclick="sendChatMessage()">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-cog"></i>
+                    Configuración
+                </h3>
+                <button onclick="toggleSettings()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>API Base URL</label>
+                    <input type="text" id="apiUrlInput" value="http://localhost:8000" placeholder="http://localhost:8000">
+                </div>
+                <div class="setting-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoReconnect" checked>
+                        <span>Reconexión automática</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="toggleSettings()">Cancelar</button>
+                <button class="btn-primary" onclick="saveSettings()">
+                    <i class="fas fa-save"></i>
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CDN Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Main App Script -->
+    <script src="/static/app_new.js"></script>
+</body>
+</html>

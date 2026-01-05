@@ -1,0 +1,3 @@
+Model,Format,FPS,Latency_ms,P95_Latency_ms
+PyTorch,PyTorch,80.6,12.41,15.8
+ONNX,ONNX,98.4,10.16,12.37
