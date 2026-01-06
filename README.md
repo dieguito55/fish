@@ -1,3 +1,4 @@
+# hola
 # 📘 MEMORIA TÉCNICA DE DESARROLLO - FISHWATCH
 
 Este documento detalla paso a paso el proceso de ingeniería realizado para construir el sistema FishWatch, desde la gestión de datos crudos hasta el despliegue de la aplicación final.
