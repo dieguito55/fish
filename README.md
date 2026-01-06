@@ -1,132 +1,119 @@
-# hola
-# 📘 MEMORIA TÉCNICA DE DESARROLLO - FISHWATCH
+🐟 FishWatch
+Sistema Inteligente de Monitoreo Acuícola con Visión Computacional y NLP
 
-Este documento detalla paso a paso el proceso de ingeniería realizado para construir el sistema FishWatch, desde la gestión de datos crudos hasta el despliegue de la aplicación final.
+FishWatch es un sistema full-stack que integra Visión Computacional (YOLO) y Procesamiento de Lenguaje Natural (NLP) para la detección, conteo y análisis de peces en tiempo real, permitiendo la interacción con los datos mediante lenguaje natural.
 
----
+👥 Equipo de Desarrollo
+Integrante	Rol Técnico
+Cristian Ticona Márquez	Product Manager & System Architect
+Vanessa Castro Callo	UX/UI Engineer & Visualization Specialist
+Jorge Olarte Quispe	Data Engineer & Dataset Curator
+Jhon Marco Aracayo Mamani	NLP Engineer & Intelligent Systems
+Juan Diego Canaza Paucara	Computer Vision Engineer & ML Deployment Lead
+📋 Gestión del Proyecto
 
-## 🏗️ FASE 0: Configuración del Entorno y Estructura
+🔗 Tablero Trello (gestión y evidencias del proyecto):
+👉 https://trello.com/invite/b/695cdbdbb31b19be8675d7f7/ATTI49cd47f841957f1d26851861ca3cfb91C333854D/fish-nlp
 
-**Objetivo:** Establecer una base sólida y reproducible para el proyecto.
+🎯 Objetivo del Proyecto
 
-### 1. Estructura de Directorios
-Se utilizó un script de automatización (`init_project.py`, ya eliminado tras su uso) para generar una arquitectura estándar de Data Science:
+Desarrollar un sistema inteligente capaz de:
 
-```
+Detectar peces en tiempo real.
+
+Almacenar métricas históricas.
+
+Permitir consultas en lenguaje natural.
+
+Generar reportes automáticos comprensibles para usuarios no técnicos.
+
+🏗️ Arquitectura General
 fishwatch/
-├── data/           # Almacenamiento de datasets (raw, processed, splits)
-├── vision/         # Scripts de entrenamiento y evaluación YOLO
+├── data/           # Datasets (raw, processed, splits)
+├── vision/         # Entrenamiento, evaluación y exportación YOLO
 ├── backend/        # API FastAPI y lógica de negocio
-├── nlp/            # Módulos de Procesamiento de Lenguaje Natural
-├── scripts/        # Herramientas de utilidad (QA, Splits, Benchmarks)
-├── static/         # Frontend (HTML/JS/CSS)
-└── reports/        # Resultados, gráficos y logs
-```
+├── nlp/            # NLP: chatbot QA y reportes automáticos
+├── scripts/        # QA, splits y benchmarks
+├── static/         # Frontend (Dashboard)
+└── reports/        # Resultados y métricas
 
-### 2. Gestión de Dependencias
-Se definieron las bibliotecas exactas en `requirements.txt` para garantizar compatibilidad:
-- **Visión:** `ultralytics` (YOLOv11), `opencv-python-headless`.
-- **Backend:** `fastapi`, `uvicorn`, `sqlalchemy`.
-- **NLP:** `sentence-transformers`, `transformers`.
+🧹 Pipeline de Datos
 
----
+Consolidación de datasets heterogéneos.
 
-## 🧹 FASE 1: Ingeniería de Datos (Data Engineering)
+Validación automática de etiquetas YOLO.
 
-**Objetivo:** Transformar datos crudos y desordenados en un dataset de alta calidad para entrenamiento.
+Splits reproducibles (70% train / 20% val / 10% test, seed=42).
 
-### Paso 1.1: "Zona de Aterrizaje" (Landing Zone)
-- **Acción:** Se consolidaron todas las imágenes y etiquetas `.txt` provenientes de diversas fuentes (DeepFish, OzFish, etc.) en una única carpeta: `data/raw/all_data/`.
-- **Resultado:** Una "sopa" de datos heterogénea lista para ser procesada.
+Validación visual de anotaciones.
 
-### Paso 1.2: Control de Calidad (QA) - `scripts/validate_labels.py`
-- **Código:** Se implementó un script de validación rigurosa.
-- **Verificaciones:**
-    1.  Existencia del par imagen-etiqueta.
-    2.  Formato de coordenadas YOLO (x_center, y_center, width, height).
-    3.  Normalización correcta (valores entre 0 y 1).
-    4.  Dimensiones positivas (width > 0, height > 0).
-- **Salida:** `reports/tables/dataset_summary.csv` con el estado de cada archivo.
+🧠 Visión Computacional
 
-### Paso 1.3: Estratificación y Splits - `scripts/make_splits.py`
-- **Código:** Script para dividir el dataset validado.
-- **Lógica:**
-    - Se aplicó una semilla aleatoria (`SEED=42`) para reproducibilidad.
-    - Distribución: **70% Train, 20% Val, 10% Test**.
-    - **Corrección de Clases:** Se normalizaron todas las clases a `0` (Fish) durante la copia para evitar inconsistencias de datasets externos.
-- **Resultado:** Estructura final en `data/splits/{train,val,test}/{images,labels}`.
+Modelos YOLOv11 (Nano y Small).
 
-### Paso 1.4: Validación Visual - `scripts/sample_viz.py`
-- **Acción:** Generación de imágenes con *bounding boxes* dibujadas sobre una muestra aleatoria.
-- **Propósito:** Verificación humana de que las etiquetas coinciden visualmente con los peces.
+Evaluación con métricas estándar:
 
----
+mAP@0.5
 
-## 🧠 FASE 2: Entrenamiento del Modelo Baseline (YOLO11n)
+mAP@0.5:0.95
 
-**Objetivo:** Establecer una línea base de rendimiento con el modelo más ligero (Nano).
+Optimización para inferencia:
 
-### Paso 2.1: Configuración - `vision/fish.yaml`
-- Definición de rutas absolutas/relativas al dataset.
-- Definición de clases (`nc: 1`, `names: ['fish']`).
+PyTorch → ONNX → TensorRT
 
-### Paso 2.2: Entrenamiento - `vision/train.py`
-- **Modelo:** YOLO11n (Nano).
-- **Hiperparámetros:** `epochs=50`, `imgsz=640`, `batch=16`.
-- **Salida:** Pesos guardados en `reports/runs/baseline_yolo11n/weights/best.pt`.
+Benchmark de FPS vs precisión para selección del modelo final.
 
-### Paso 2.3: Evaluación Técnica - `vision/eval.py`
-- **Acción:** Evaluación del modelo entrenado sobre el conjunto de **TEST** (datos nunca vistos).
-- **Métricas Generadas:**
-    - mAP@0.5 (Precisión media con IoU 0.5).
-    - mAP@0.5:0.95 (Métrica estricta COCO).
-    - Matrices de Confusión y Curvas PR.
+💬 NLP y Chatbot Inteligente
 
----
+Sentence-Transformers (Sentence-BERT) para detección de intención.
 
-## 🚀 FASE 3: Mejora y Optimización (Challenger Model)
+Arquitectura híbrida tipo RAG:
 
-**Objetivo:** Superar al baseline y optimizar para inferencia en tiempo real.
+El NLP interpreta la pregunta.
 
-### Paso 3.1: Entrenamiento Challenger - `vision/train_s.py`
-- **Modelo:** YOLO11s (Small) - Mayor capacidad que el Nano.
-- **Estrategia:** Comparar si el aumento de parámetros justifica la ganancia en precisión vs. la pérdida de FPS.
+Los datos reales se obtienen vía SQL.
 
-### Paso 3.2: Exportación y Optimización - `vision/export.py`
-- **Acción:** Conversión de los modelos PyTorch (`.pt`) a formatos de inferencia optimizada.
-- **Formatos:**
-    - **ONNX:** Para interoperabilidad y ejecución en CPU rápida.
-    - **TensorRT (.engine):** (Opcional) Para máxima velocidad en GPUs NVIDIA.
+Evita alucinaciones al no generar valores numéricos.
 
-### Paso 3.3: Benchmark de Trade-offs - `scripts/bench_fps.py`
-- **Código:** Script dedicado a medir rendimiento puro.
-- **Prueba:** Ejecuta inferencia en bucle sobre imágenes de prueba.
-- **Métricas:** FPS promedio y Latencia (ms) para cada formato (PT vs ONNX) y tamaño (Nano vs Small).
-- **Resultado:** Tabla comparativa para justificar la elección del modelo final en producción.
+📊 Reportes Automáticos
 
----
+Uso de LLM (GPT-2 en español) solo para redacción.
 
-## 🌐 FASE 4: Integración y Despliegue (Full Stack)
+Técnica de Slot Filling:
 
-**Objetivo:** Construir la aplicación final utilizable por el usuario.
+Texto generado por IA.
 
-### Paso 4.1: Backend (FastAPI) - `backend/app.py`
-- **API REST:** Endpoints para gestión de video y datos.
-- **WebSocket:** Transmisión de video procesado y metadatos en tiempo real.
-- **Base de Datos:** SQLite con SQLAlchemy para persistencia de detecciones.
+Métricas insertadas directamente desde la base de datos.
 
-### Paso 4.2: NLP (RAG) - `nlp/qa.py`
-- **Implementación:** Sistema de preguntas y respuestas sobre los datos SQL.
-- **Tecnología:** Sentence Transformers para detectar intención del usuario ("¿Cuántos peces hubo ayer?") y traducir a consultas SQL.
+Reportes legibles para toma de decisiones.
 
-### Paso 4.3: Frontend Moderno - `static/`
-- **Interfaz:** HTML5 + CSS3 + JavaScript Vanilla (sin frameworks pesados).
-- **Características:**
-    - Dashboard de KPIs en tiempo real.
-    - Chatbot integrado para consultas NLP.
-    - Visualización de video con bounding boxes.
+🌐 Aplicación Web
 
----
+Backend: FastAPI + SQLAlchemy.
 
-## ✅ Conclusión
-El sistema ha seguido un flujo de desarrollo profesional, desde la limpieza de datos hasta la optimización de modelos y despliegue web, cumpliendo con todos los requisitos de la rúbrica de evaluación.
+Frontend: Dashboard interactivo (HTML, CSS, JavaScript).
+
+Video en tiempo real con detecciones.
+
+KPIs y filtros históricos.
+
+Chatbot integrado.
+
+🛠️ Tecnologías Utilizadas
+
+Visión: Ultralytics YOLO, OpenCV
+
+NLP: Sentence-Transformers, HuggingFace Transformers
+
+Backend: FastAPI, SQLAlchemy
+
+Optimización: ONNX, TensorRT
+
+Base de Datos: SQLite / PostgreSQL
+
+✅ Estado del Proyecto
+
+✔ Desarrollo completo
+✔ Evaluación técnica realizada
+✔ Optimización y despliegue funcional
+✔ Documentación y gestión en Trello
